@@ -60,21 +60,30 @@
             align-items: center;
             padding-top: 60px;
             position: relative;
-            background-color: var(--bg-base);
+            background-color: var(--hero-dark);
             overflow: hidden;
         }
 
-        /* The Image stays in the background of the hero only */
-        .hero-image-reveal {
+        .hero-base {
+            position: absolute;
+            inset: 0;
+            background: var(--hero-dark);
+            z-index: 0;
+        }
+
+        /* The image spans a wide right-side layer, then fades asymmetrically into the dark base. */
+        .hero-image {
             position: absolute;
             top: 0;
             right: 0;
-            width: 50%;
+            width: var(--blend-width);
             height: 100%;
             background-image: url('https://raw.githubusercontent.com/chitch-clgx/chrp-website/main/cannabis-grass-marijuana-maria-yerba-thumbnail.jpg');
             background-size: cover;
-            background-position: center;
+            background-position: center right;
             z-index: 1;
+            -webkit-mask-image: linear-gradient(to right, transparent var(--blend-start), rgba(0, 0, 0, 0.6) var(--blend-mid), #000 var(--blend-end));
+            mask-image: linear-gradient(to right, transparent var(--blend-start), rgba(0, 0, 0, 0.6) var(--blend-mid), #000 var(--blend-end));
         }
 
         /* The right-half exploding brick wall sits above the hero image and below copy. */
