@@ -18,21 +18,13 @@
             --text-dim: rgba(241, 248, 233, 0.6);
             --border: rgba(212, 225, 87, 0.1);
             --header-glass: rgba(27, 36, 33, 0.85);
-            /* Exploding wall README: keep TILE_COUNT in sync with --tile-count.
-               Tune --stagger/--tile-duration for speed, --taper-width to protect
-               hero copy, and --blend-* to soften the photo-to-dark transition.
-               Use the canvas fallback when TILE_COUNT rises above 200-300 tiles. */
-            --hero-dark: #0b0b0d;
+            /* Exploding wall tuning: keep TILE_COUNT in sync with --tile-count.
+               README note: raise TILE_COUNT for denser brick walls, but switch to the
+               canvas fallback above 300 tiles to avoid excessive DOM work on mobile. */
             --tile-count: 120;
-            --stagger: 0.035s;
-            --tile-duration: 900ms;
-            --tile-gap: 6px;
-            --taper-width: 28%;
-            --blend-start: 0%;
-            --blend-mid: 30%;
-            --blend-end: 70%;
-            --blend-width: 72%;
-            --glint-frequency: 8s;
+            --stagger: 45ms;
+            --tile-gap: 1px;
+            --glint-frequency: 9s;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,28 +86,19 @@
             mask-image: linear-gradient(to right, transparent var(--blend-start), rgba(0, 0, 0, 0.6) var(--blend-mid), #000 var(--blend-end));
         }
 
-        /* Full-width wall prevents a hard cutoff; JS tapers tiles before they reach hero copy. */
+        /* The right-half exploding brick wall sits above the hero image and below copy. */
         .brick-overlay {
             position: absolute;
-            inset: 0;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
             z-index: 2;
             pointer-events: none;
             overflow: hidden;
             --cols: 12;
             --rows: 10;
-            --max-col: 11;
         }
-
-        .brick-overlay::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: var(--hero-dark);
-            opacity: 1;
-            transition: opacity var(--tile-duration) ease;
-        }
-
-        .brick-overlay.explode::before { opacity: 0; }
 
         .brick-grid {
             position: absolute;
@@ -124,23 +107,21 @@
             grid-template-columns: repeat(var(--cols), 1fr);
             grid-template-rows: repeat(var(--rows), 1fr);
             gap: var(--tile-gap);
-            padding: calc(var(--tile-gap) * 0.5);
         }
 
         .brick {
             position: relative;
             overflow: hidden;
             background:
-                linear-gradient(135deg, rgba(255, 255, 255, 0.07), transparent 44%),
-                var(--hero-dark);
-            --delay: calc((var(--max-col) - var(--col)) * var(--stagger) + var(--taper-delay-offset, 0s));
+                linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 42%),
+                var(--bg-base);
+            --delay: calc(var(--col) * var(--stagger));
             opacity: 1;
-            transform: translate3d(0, 0, 0) rotate(0deg) scale(var(--tile-scale-x, 1), var(--tile-scale-y, 1));
+            transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
             transition:
-                transform var(--tile-duration) cubic-bezier(0.16, 1, 0.3, 1) var(--delay),
-                opacity 620ms ease var(--delay);
-            box-shadow: 0 0 0 calc(var(--tile-gap) * 0.55) var(--hero-dark);
-            filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.12));
+                transform 900ms cubic-bezier(0.16, 1, 0.3, 1) var(--delay),
+                opacity 520ms ease var(--delay);
+            will-change: transform, opacity;
             backface-visibility: hidden;
         }
 
@@ -158,14 +139,12 @@
             pointer-events: none;
         }
 
-        .brick-overlay.is-ready .brick { will-change: transform, opacity; }
-
         .brick-overlay.explode .brick {
-            opacity: var(--end-opacity, 0);
+            opacity: 0;
             transform:
-                translate3d(calc(var(--fly-x, 120px) * -1 * var(--taper-factor, 1)), calc(var(--fly-y, 0px) * var(--taper-factor, 1)), 0)
-                rotate(calc(var(--rot, -8deg) * var(--taper-factor, 1)))
-                scale(calc(var(--tile-scale-x, 1) * 0.9), calc(var(--tile-scale-y, 1) * 0.9));
+                translate3d(calc((var(--col) + 1) * 10px), calc((var(--row) * 9px) - (var(--rows) * 4.5px)), 0)
+                rotate(calc((var(--row) - var(--col)) * 4deg))
+                scale(0.88);
         }
 
         .brick-canvas-layer {
@@ -177,6 +156,7 @@
             transition: opacity 700ms ease;
         }
 
+        .brick-overlay.explode .brick-canvas-layer { opacity: 0; }
 
         @keyframes brick-glint {
             0%, 72% { transform: translate3d(-120%, 0, 0); }
@@ -186,17 +166,15 @@
         @media (prefers-reduced-motion: reduce) {
             .brick,
             .brick-canvas-layer {
-                transition: opacity 300ms ease var(--delay, 0s);
+                transition: opacity 300ms ease var(--delay, 0ms);
             }
 
             .brick::after { animation: none; }
 
             .brick-overlay.explode .brick {
-                opacity: var(--end-opacity, 0);
+                opacity: 0;
                 transform: none;
             }
-
-            .brick-overlay.explode .brick-canvas-layer { opacity: 0; }
         }
 
         .hero-text { position: relative; z-index: 20; max-width: 650px; }
@@ -240,12 +218,11 @@
     </header>
 
     <section class="hero">
-        <div class="hero-base"></div>
-        <div class="hero-image"></div>
-
-        <!-- Use data-effect="off" to disable the wall for low-power devices or A/B tests. -->
-        <div class="brick-overlay" data-effect="exploding" data-tile-count="120"></div>
-        <!-- Debug density helper: <div class="brick-debug">TILE_COUNT: 120</div> -->
+        <!-- The background image reveal -->
+        <div class="hero-image-reveal"></div>
+        
+        <!-- The exploding wall reveal is generated by JS so timing and density stay tunable. -->
+        <div class="brick-overlay" data-effect="exploding"></div>
 
         <div class="chrp-wrapper">
             <div class="hero-text">
@@ -277,194 +254,98 @@
     </section>
 
     <script>
-        // TILE_COUNT defaults to 120 for mobile-friendly DOM animation.
-        // Counts above 200-300 can jank on mid-tier phones, so values above
-        // MAX_DOM_TILES or low-power devices use the canvas fallback instead.
+        // Exploding wall tuning: TILE_COUNT controls DOM tile density (default 120).
+        // Keep TILE_COUNT at or below 300 for CSS-driven UI overlays. Above 300, this
+        // script switches to layered canvas with an OffscreenCanvas cache, following
+        // MDN-style canvas performance guidance for expensive repeated drawing.
         const TILE_COUNT = 120;
         const MAX_DOM_TILES = 300;
-        const LOW_POWER_DEVICE = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
-        const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        const overlay = document.querySelector('.brick-overlay');
-
-        function cssSeconds(name, fallback) {
-            const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            if (!value) return fallback;
-            return value.endsWith('ms') ? parseFloat(value) / 1000 : parseFloat(value);
-        }
-
-        function taperForCenter(centerPct, taperPct) {
-            if (centerPct >= taperPct) return { factor: 1, delayOffset: 0, endOpacity: 0 };
-            const factor = Math.max(0.08, centerPct / taperPct);
-            return {
-                factor,
-                delayOffset: (1 - factor) * 0.35,
-                endOpacity: (1 - factor) * 0.42
-            };
-        }
+        const overlay = document.querySelector('.brick-overlay[data-effect="exploding"]');
 
         function buildBrickGrid(target, tileCount) {
             const cols = Math.ceil(Math.sqrt(tileCount * 1.2));
             const rows = Math.ceil(tileCount / cols);
-            const taperPct = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--taper-width')) || 28;
             const grid = document.createElement('div');
             grid.className = 'brick-grid';
-            target.dataset.tileCount = tileCount;
             target.style.setProperty('--tile-count', tileCount);
             target.style.setProperty('--cols', cols);
             target.style.setProperty('--rows', rows);
-            target.style.setProperty('--max-col', cols - 1);
 
             for (let i = 0; i < tileCount; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
-                const centerPct = ((col + 0.5) / cols) * 100;
-                const taper = taperForCenter(centerPct, taperPct);
                 const brick = document.createElement('span');
-                const scaleX = 0.94 + ((col % 4) * 0.025);
-                const scaleY = 0.94 + ((row % 3) * 0.03);
                 brick.className = 'brick';
                 brick.style.setProperty('--col', col);
                 brick.style.setProperty('--row', row);
-                brick.style.setProperty('--taper-factor', taper.factor.toFixed(3));
-                brick.style.setProperty('--taper-delay-offset', `${taper.delayOffset.toFixed(3)}s`);
-                brick.style.setProperty('--end-opacity', taper.endOpacity.toFixed(3));
-                brick.style.setProperty('--fly-x', `${(90 + Math.random() * 150).toFixed(1)}px`);
-                brick.style.setProperty('--fly-y', `${(-55 + Math.random() * 110).toFixed(1)}px`);
-                brick.style.setProperty('--rot', `${(-18 + Math.random() * 36).toFixed(1)}deg`);
-                brick.style.setProperty('--tile-scale-x', scaleX.toFixed(3));
-                brick.style.setProperty('--tile-scale-y', scaleY.toFixed(3));
                 brick.style.setProperty('--glint-delay', `${-(Math.random() * 10).toFixed(2)}s`);
-                brick.style.setProperty('--glint-duration', `calc(var(--glint-frequency) + ${(Math.random() * 4).toFixed(2)}s)`);
+                brick.style.setProperty('--glint-duration', `calc(var(--glint-frequency) + ${(Math.random() * 5).toFixed(2)}s)`);
                 grid.appendChild(brick);
             }
 
             target.appendChild(grid);
-            return cols;
         }
 
         function buildCanvasWall(target, tileCount) {
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const tiles = [];
-            let rect = target.getBoundingClientRect();
-            let ratio = window.devicePixelRatio || 1;
-            let cols = 1;
-            let rows = 1;
-            let tileW = 1;
-            let tileH = 1;
-            let cache;
             canvas.className = 'brick-canvas-layer';
-            target.dataset.tileCount = tileCount;
             target.appendChild(canvas);
 
-            const makeCache = () => {
-                cache = typeof OffscreenCanvas !== 'undefined'
+            const paint = () => {
+                const rect = target.getBoundingClientRect();
+                const ratio = window.devicePixelRatio || 1;
+                const cols = Math.ceil(Math.sqrt(tileCount * 1.2));
+                const rows = Math.ceil(tileCount / cols);
+                canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+                canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = `${rect.height}px`;
+
+                const ctx = canvas.getContext('2d');
+                const tileW = canvas.width / cols;
+                const tileH = canvas.height / rows;
+                const cache = typeof OffscreenCanvas !== 'undefined'
                     ? new OffscreenCanvas(Math.ceil(tileW), Math.ceil(tileH))
                     : document.createElement('canvas');
                 cache.width = Math.ceil(tileW);
                 cache.height = Math.ceil(tileH);
                 const cacheCtx = cache.getContext('2d');
-                cacheCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--hero-dark').trim() || '#0b0b0d';
+                cacheCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim() || '#1B2421';
                 cacheCtx.fillRect(0, 0, cache.width, cache.height);
-                cacheCtx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+                cacheCtx.fillStyle = 'rgba(255, 255, 255, 0.06)';
                 cacheCtx.beginPath();
                 cacheCtx.moveTo(0, 0);
                 cacheCtx.lineTo(cache.width, 0);
                 cacheCtx.lineTo(0, cache.height);
                 cacheCtx.fill();
-            };
 
-            const size = () => {
-                rect = target.getBoundingClientRect();
-                ratio = window.devicePixelRatio || 1;
-                cols = Math.ceil(Math.sqrt(tileCount * 1.2));
-                rows = Math.ceil(tileCount / cols);
-                canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-                canvas.height = Math.max(1, Math.floor(rect.height * ratio));
-                canvas.style.width = `${rect.width}px`;
-                canvas.style.height = `${rect.height}px`;
-                tileW = canvas.width / cols;
-                tileH = canvas.height / rows;
-                makeCache();
-            };
-
-            const seedTiles = () => {
-                tiles.length = 0;
-                const taperPct = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--taper-width')) || 28;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
                 for (let i = 0; i < tileCount; i++) {
                     const col = i % cols;
                     const row = Math.floor(i / cols);
-                    const taper = taperForCenter(((col + 0.5) / cols) * 100, taperPct);
-                    tiles.push({
-                        col,
-                        row,
-                        taper,
-                        flyX: (90 + Math.random() * 150) * ratio,
-                        flyY: (-55 + Math.random() * 110) * ratio,
-                        rot: (-18 + Math.random() * 36) * Math.PI / 180,
-                        scaleX: 0.94 + ((col % 4) * 0.025),
-                        scaleY: 0.94 + ((row % 3) * 0.03)
-                    });
+                    ctx.drawImage(cache, col * tileW, row * tileH, tileW - ratio, tileH - ratio);
                 }
             };
 
-            const draw = (progress = 0) => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                tiles.forEach((tile) => {
-                    const eased = 1 - Math.pow(1 - progress, 3);
-                    const x = tile.col * tileW + tileW / 2;
-                    const y = tile.row * tileH + tileH / 2;
-                    const alpha = 1 - ((1 - tile.taper.endOpacity) * eased);
-                    ctx.save();
-                    ctx.globalAlpha = alpha;
-                    ctx.translate(x - tile.flyX * tile.taper.factor * eased, y + tile.flyY * tile.taper.factor * eased);
-                    ctx.rotate(tile.rot * tile.taper.factor * eased);
-                    ctx.scale(tile.scaleX * (1 - 0.1 * eased), tile.scaleY * (1 - 0.1 * eased));
-                    ctx.drawImage(cache, -tileW / 2, -tileH / 2, tileW - ratio, tileH - ratio);
-                    ctx.restore();
-                });
-            };
-
-            size();
-            seedTiles();
-            draw();
-            window.addEventListener('resize', () => { size(); seedTiles(); draw(); }, { passive: true });
-
-            return () => {
-                const duration = (cssSeconds('--tile-duration', 0.9) + cssSeconds('--stagger', 0.035) * cols + 0.35) * 1000;
-                const start = performance.now();
-                const tick = (now) => {
-                    const progress = Math.min(1, (now - start) / duration);
-                    draw(progress);
-                    if (progress < 1) requestAnimationFrame(tick);
-                };
-                requestAnimationFrame(tick);
-            };
+            paint();
+            window.addEventListener('resize', paint, { passive: true });
         }
 
-        if (overlay && overlay.dataset.effect !== 'off') {
-            const useCanvas = TILE_COUNT > MAX_DOM_TILES || LOW_POWER_DEVICE;
-            const runCanvas = useCanvas ? buildCanvasWall(overlay, TILE_COUNT) : null;
-            const maxCol = useCanvas ? Math.ceil(Math.sqrt(TILE_COUNT * 1.2)) - 1 : buildBrickGrid(overlay, TILE_COUNT) - 1;
-            const cleanupMs = (cssSeconds('--tile-duration', 0.9) + cssSeconds('--stagger', 0.035) * maxCol + 0.45) * 1000;
+        if (overlay) {
+            if (TILE_COUNT > MAX_DOM_TILES) {
+                buildCanvasWall(overlay, TILE_COUNT);
+            } else {
+                buildBrickGrid(overlay, TILE_COUNT);
+            }
 
             const observer = new IntersectionObserver(([entry]) => {
-                if (!entry.isIntersecting || overlay.classList.contains('explode')) return;
-                overlay.classList.add('is-ready');
-                overlay.classList.add('explode');
-                if (runCanvas && !REDUCED_MOTION) runCanvas();
-                window.setTimeout(() => {
-                    overlay.classList.remove('is-ready');
-                    overlay.style.pointerEvents = 'none';
-                }, cleanupMs);
-                observer.disconnect();
+                overlay.classList.toggle('explode', entry.isIntersecting);
             }, { threshold: 0.35 });
 
-            observer.observe(document.querySelector('.hero'));
-        } else if (overlay) {
-            overlay.hidden = true;
+            observer.observe(overlay);
         }
     </script>
+
 </body>
 </html>
